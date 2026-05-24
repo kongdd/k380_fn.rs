@@ -47,6 +47,9 @@ sudo udevadm control --reload-rules && sudo udevadm trigger
 | Vendor ID  | `0x046d`（Logitech） |
 | Product ID | `0xb342`             |
 
-## 依赖
+
+## References
+
+- <https://github.com/dheygere/k380-fn-lock-for-windows>
 
 - [hidapi](https://crates.io/crates/hidapi)
