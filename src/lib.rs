@@ -1,15 +1,46 @@
 use hidapi::HidApi;
 
+#[cfg(target_os = "macos")]
+mod karabiner;
+
 const K380_VID: u16 = 0x046d;
 const K380_PID: u16 = 0xb342;
 const TARGET_USAGE: u16 = 1;
 const TARGET_USAGE_PAGE: u16 = 65280;
 
-const K380_SEQ_FKEYS_ON:  [u8; 7] = [0x10, 0xff, 0x0b, 0x1e, 0x00, 0x00, 0x00];
-const K380_SEQ_FKEYS_OFF: [u8; 7] = [0x10, 0xff, 0x0b, 0x1e, 0x01, 0x00, 0x00];
+type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
-pub fn k380_set_fn_keys(fn_keys: bool) -> Result<(), Box<dyn std::error::Error>> {
+pub fn k380_set_fn_keys(fn_keys: bool) -> Result<()> {
+    let result = set_fn_keys(fn_keys);
+    #[cfg(target_os = "macos")]
+    if is_exclusive_error(&result) {
+        eprintln!("设备被独占，临时释放 Karabiner 对 K380 的接管…");
+        let mut release = karabiner::Release::new()?;
+        let mut result = result;
+        for _ in 0..20 {
+            std::thread::sleep(std::time::Duration::from_millis(250));
+            result = set_fn_keys(fn_keys);
+            if !is_exclusive_error(&result) {
+                break;
+            }
+        }
+        release.restore()?;
+        return result;
+    }
+    result
+}
+
+#[cfg(target_os = "macos")]
+fn is_exclusive_error(result: &Result<()>) -> bool {
+    result
+        .as_ref()
+        .is_err_and(|e| e.to_string().contains("0xE00002C5"))
+}
+
+fn set_fn_keys(fn_keys: bool) -> Result<()> {
     let api = HidApi::new()?;
+    #[cfg(target_os = "macos")]
+    api.set_open_exclusive(false);
 
     let device_info = api
         .device_list()
@@ -23,18 +54,12 @@ pub fn k380_set_fn_keys(fn_keys: bool) -> Result<(), Box<dyn std::error::Error>>
 
     let device = device_info.open_device(&api)?;
 
-    let (seq, label) = if fn_keys {
-        (&K380_SEQ_FKEYS_ON, "Set function keys as default")
-    } else {
-        (&K380_SEQ_FKEYS_OFF, "Set media keys as default")
-    };
-
-    println!("{}", label);
-
-    let written = device.write(seq)?;
+    let seq = [0x10, 0xff, 0x0b, 0x1e, u8::from(!fn_keys), 0, 0];
+    let written = device.write(&seq)?;
     if written != seq.len() {
-        eprintln!("警告：只写入了 {} / {} 字节", written, seq.len());
+        return Err(format!("只写入了 {written} / {} 字节", seq.len()).into());
     }
-
+    let mode = if fn_keys { "function" } else { "media" };
+    println!("Set {mode} keys as default");
     Ok(())
 }

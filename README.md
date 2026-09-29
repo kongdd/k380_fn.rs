@@ -20,6 +20,15 @@ cargo build --release
 
 产物位于 `target/release/`。
 
+## macOS / Karabiner
+
+使用共享模式访问设备。若 Karabiner 独占 K380，程序会临时修改
+`~/.config/karabiner/karabiner.json`，释放 K380 后重试（最多 5 秒），
+完成或返回错误时恢复原配置，无需 sudo，也不停止其他设备的映射。
+
+备份为同目录下的 `karabiner.json.k380-backup`。强制终止或断电时可能无法恢复；
+若配置被其他程序修改，程序不会覆盖它，备份也会保留。存在备份时拒绝再次修改配置。
+
 ## Linux 额外配置
 
 **安装 hidapi 依赖：**
