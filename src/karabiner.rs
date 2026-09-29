@@ -5,7 +5,6 @@ use crate::{Result, K380_PID, K380_VID};
 
 pub struct Release {
     path: PathBuf,
-    backup: PathBuf,
     original: Vec<u8>,
     temporary: Value,
     active: bool,
@@ -18,29 +17,19 @@ impl Release {
         let original = fs::read(&path)?;
         let mut temporary: Value = serde_json::from_slice(&original)?;
         release_k380(&mut temporary)?;
-        let backup = path.with_extension("json.k380-backup");
-        let mut file = fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&backup)
-            .map_err(|e| format!("无法创建备份 {}：{e}", backup.display()))?;
-        file.set_permissions(fs::metadata(&path)?.permissions())?;
-        file.write_all(&original)?;
-        file.sync_all()?;
-        let mut guard = Self {
+
+        let mut release = Self {
             path,
-            backup,
             original,
             temporary,
             active: false,
         };
-        // Refuse to overwrite changes made while preparing the backup.
-        if fs::read(&guard.path)? != guard.original {
-            return Err("Karabiner 配置已变更，已保留备份，未修改配置".into());
+        if fs::read(&release.path)? != release.original {
+            return Err("Karabiner 配置已变更，未修改配置".into());
         }
-        guard.replace(&serde_json::to_vec_pretty(&guard.temporary)?)?;
-        guard.active = true;
-        Ok(guard)
+        release.replace(&serde_json::to_vec_pretty(&release.temporary)?)?;
+        release.active = true;
+        Ok(release)
     }
 
     fn replace(&self, contents: &[u8]) -> Result<()> {
@@ -67,15 +56,10 @@ impl Release {
         }
         let current: Value = serde_json::from_slice(&fs::read(&self.path)?)?;
         if current != self.temporary {
-            return Err(format!(
-                "Karabiner 配置被其他程序修改，未覆盖；原配置备份：{}",
-                self.backup.display()
-            )
-            .into());
+            return Err("Karabiner 配置被其他程序修改，未覆盖".into());
         }
         self.replace(&self.original)?;
         self.active = false;
-        fs::remove_file(&self.backup)?;
         Ok(())
     }
 }

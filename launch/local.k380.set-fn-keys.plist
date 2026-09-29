@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>local.k380.set-fn-keys</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/sh</string>
+        <string>-c</string>
+        <string>exec &gt;&gt;"$HOME/Library/Logs/k380-fn.log" 2&gt;&amp;1; for i in 1 2 3; do "$HOME/.cargo/bin/setFnKeys" &amp;&amp; exit 0; [ "$i" = 3 ] &amp;&amp; exit 1; sleep 30; done</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+</dict>
+</plist>
