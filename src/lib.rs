@@ -28,6 +28,7 @@ pub fn k380_set_fn_keys(fn_keys: bool) -> Result<(), Box<dyn std::error::Error>>
         // since usage_page/usage are not a reliable way to identify HID++.
         let mut last_error = None;
         let mut found = false;
+        let mut sent = false;
         for info in api
             .device_list()
             .filter(|d| d.vendor_id() == K380_VID && d.product_id() == K380_PID)
@@ -37,9 +38,12 @@ pub fn k380_set_fn_keys(fn_keys: bool) -> Result<(), Box<dyn std::error::Error>>
                 .open_device(&api)
                 .and_then(|device| device.send_output_report(seq))
             {
-                Ok(()) => return Ok(()),
+                Ok(()) => sent = true,
                 Err(error) => last_error = Some(error),
             }
+        }
+        if sent {
+            return Ok(());
         }
         if !found {
             return Err("K380 设备未找到，请确认键盘已连接且已配对".into());

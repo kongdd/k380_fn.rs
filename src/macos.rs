@@ -116,7 +116,13 @@ pub fn watch(report: &[u8; 7]) -> Result<(), Box<dyn std::error::Error>> {
         if manager.is_null() {
             return Err("无法创建 HID manager".into());
         }
-        let matching = matching_dictionary()?;
+        let matching = match matching_dictionary() {
+            Ok(matching) => matching,
+            Err(error) => {
+                CFRelease(manager);
+                return Err(error);
+            }
+        };
         IOHIDManagerSetDeviceMatching(manager, matching);
         CFRelease(matching);
 
