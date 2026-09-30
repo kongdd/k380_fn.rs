@@ -3,6 +3,8 @@ use std::{fs, io::Write, path::PathBuf};
 
 use crate::{Result, K380_PID, K380_VID};
 
+// 临时释放 K380；保存原始字节以便恢复配置及其格式。
+// Drop 在正常退出作用域时兜底恢复，强制终止或断电无法恢复。
 pub struct Release {
     path: PathBuf,
     original: Vec<u8>,
@@ -24,6 +26,7 @@ impl Release {
             temporary,
             active: false,
         };
+        // 写入前再次检查，尽量避免覆盖期间发生的外部修改。
         if fs::read(&release.path)? != release.original {
             return Err("Karabiner 配置已变更，未修改配置".into());
         }
@@ -32,6 +35,7 @@ impl Release {
         Ok(release)
     }
 
+    // 同目录临时文件写完后原子替换，避免留下半写入的 JSON。
     fn replace(&self, contents: &[u8]) -> Result<()> {
         let temp = self.path.with_extension("json.k380-tmp");
         let mut file = fs::OpenOptions::new()
@@ -55,6 +59,7 @@ impl Release {
             return Ok(());
         }
         let current: Value = serde_json::from_slice(&fs::read(&self.path)?)?;
+        // 只恢复仍等于本程序临时配置的文件，保留用户或其他程序的修改。
         if current != self.temporary {
             return Err("Karabiner 配置被其他程序修改，未覆盖".into());
         }
@@ -72,6 +77,7 @@ impl Drop for Release {
     }
 }
 
+// 仅修改当前 profile 的 K380：ignore=true 让 Karabiner 放弃接管。
 fn release_k380(config: &mut Value) -> Result<()> {
     let profile = config["profiles"]
         .as_array_mut()
